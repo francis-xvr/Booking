@@ -3,8 +3,7 @@
 </script>
 
 <template>
-  <div>
+  <div id="app">
     <home-component></home-component>
   </div>
 </template>
-
