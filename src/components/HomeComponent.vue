@@ -23,26 +23,28 @@ onMounted(() => {
   const geometry = new THREE.BoxGeometry(0.1, 0.1, 0.1)
   const material = new THREE.MeshBasicMaterial({ color: 0xf0f0f0 }) // Light gray color
   const cube = new THREE.Mesh(geometry, material)
+  cube.position.set(0, 0, -8) // Center the cube
   const cameraAnchor = new THREE.Mesh(geometry, material)
   cameraAnchor.position.set(0, 2, 0) // Center the cube
   scene.add(cube)
   scene.add(cameraAnchor)
 
   // Add an elliptical plane resembling a cricket ground
-  const groundGeometry = new THREE.CircleGeometry(10, 64) // Radius 10, 64 segments for smoothness
+  const groundGeometry = new THREE.CircleGeometry(13, 64) // Radius 10, 64 segments for smoothness
   const groundMaterial = new THREE.MeshBasicMaterial({ color: 0x228B22 }) // Green color resembling grass
   const ground = new THREE.Mesh(groundGeometry, groundMaterial)
   ground.rotation.x = -Math.PI / 2 // Rotate to lie flat on the xz-plane
+  ground.position.z = -1.5 // Adjust position to move the ground further from the origin
   ground.scale.set(1.5, 1, 1) // Scale to make it elliptical with longer axis on x-axis
   scene.add(ground)
 
   const seatGeometry = new THREE.BoxGeometry(0.5, 0.5, 0.1)
 
-  const baseRadius = 10 // Larger base radius for a less circular arch
-  const rowSpacing = 0.8 // Distance between rows
+  const baseRadius = 20 // Larger base radius for a less circular arch
+  const rowSpacing = 0.7 // Distance between rows
   const elevationStep = 0.4 // Elevation difference between rows
   const seatGap = 0.6 // Desired gap between seats in a row
-  const angleRange = Math.PI / 4 // Limit the arch to 45 degrees (from -135 to -90 degrees)
+  const angleRange = Math.PI / 8 // Limit the arch to 45 degrees (from -135 to -90 degrees)
 
   const raycaster = new THREE.Raycaster() // Initialize raycaster
   const mouse = new THREE.Vector2() // Track mouse position
@@ -59,12 +61,12 @@ onMounted(() => {
     const angleStep = angleRange / seatsInRow // Calculate the angle step for the seats
 
     for (let i = 0; i < seatsInRow; i++) { // Loop for dynamically calculated seats per row
-      const angle = angleStep * i - (2.5 * Math.PI) / 4 // Start from -135 degrees to -90 degrees
+      const angle = angleStep * i - (2.25 * Math.PI) / 4 // Start from -135 degrees to -90 degrees
       const x = radius * Math.cos(angle)
       const z = radius * Math.sin(angle)// Increase z-axis offset to move seats further from origin
       const seatMaterial = new THREE.MeshBasicMaterial({ color: 0xf0f0f0 }) // Create a unique material for each seat
       const newCube = new THREE.Mesh(seatGeometry, seatMaterial)
-      newCube.position.set(x, row * elevationStep, -z+0.2) // Adjust z position
+      newCube.position.set(x, row * elevationStep, -z - 8) // Adjust z position
 
       // Make the cube look at the original cube
       newCube.lookAt(cube.position)
@@ -78,25 +80,25 @@ onMounted(() => {
 //   const axesHelper = new THREE.AxesHelper(5) // Size of the axes
 //   scene.add(axesHelper)
 
-  camera.position.z = 10 // Move the camera further away along the z-axis
+  camera.position.z = 15 // Move the camera further away along the z-axis
   camera.position.y = 25 // Adjust the y-axis to ensure a better view of the cubes
 
   // Mouse movement variables
   let targetX = 0
   let targetY = 0
   let currentX = 0
-  let currentY = 15 // Initialize to match camera.position.y
+  let currentY = 1 // Initialize to match camera.position.y
   const dampingFactor = 0.07
 
   // Mouse move listener
   const onMouseMove = (event) => {
     const { innerWidth, innerHeight } = window
     targetX = (event.clientX / innerWidth) * 2 - 1
-    targetY = -(event.clientY / innerHeight) * 2 + 1.5 // Normalize targetY to the full height of the window
+    targetY = -(event.clientY / innerHeight) * 2 // Normalize targetY to the full height of the window
 
     // Update mouse position for raycasting
     mouse.x = (event.clientX / innerWidth) * 2 - 1
-    mouse.y = -(event.clientY / innerHeight) * 2 + 1
+    mouse.y = -(event.clientY / innerHeight) * 2
   }
 
   window.addEventListener('mousemove', onMouseMove)
@@ -116,19 +118,39 @@ onMounted(() => {
   window.addEventListener('click', onMouseClick)
 
   // Initialize stats.js
-  const stats = new Stats()
-  stats.showPanel(0) // 0: FPS, 1: MS, 2: MB
-  document.body.appendChild(stats.dom)
+//   const stats = new Stats()
+//   stats.showPanel(0) // 0: FPS, 1: MS, 2: MB
+//   document.body.appendChild(stats.dom)
 
   const fps = 60 // Target FPS
   const frameInterval = 1000 / fps // Time per frame in milliseconds
   let lastRenderTime = 0 // Track the last render time
 
-  const minCameraY = 4 // Minimum y position for the camera to stay above the seats
-  const baseCameraZ = 16 // Original z position of the camera
-  const maxCameraZ = 16 // Reduce maximum z position for a less pronounced zoom
+  const minCameraY = 6 // Minimum y position for the camera to stay above the seats
+  const baseCameraZ = 18 // Original z position of the camera
+//   const maxCameraZ = 18 // Reduce maximum z position for a less pronounced zoom
 
   const originalCubeZ = cameraAnchor.position.z // Store the original z position of the cube
+
+  let minSeatX = Infinity
+  let maxSeatX = -Infinity
+  let minSeatZ = Infinity
+  let maxSeatZ = -Infinity
+
+  // Calculate the bounds of the seats
+  for (const seat of seats) {
+    minSeatX = Math.min(minSeatX, seat.position.x)
+    maxSeatX = Math.max(maxSeatX, seat.position.x)
+    minSeatZ = Math.min(minSeatZ, seat.position.z)
+    maxSeatZ = Math.max(maxSeatZ, seat.position.z)
+  }
+
+  // Add some padding to the bounds
+  const padding = 2
+  minSeatX -= padding
+  maxSeatX += padding
+  minSeatZ -= padding
+  maxSeatZ += padding
 
   const animate = (time) => {
     requestAnimationFrame(animate)
@@ -136,14 +158,12 @@ onMounted(() => {
     currentX += (targetX - currentX) * dampingFactor
     currentY += (targetY - currentY) * dampingFactor
 
-    camera.position.x = currentX * 2
-    camera.position.y = Math.max(currentY * 2 + 3, minCameraY) // Clamp y position to stay above the seats
+    // Pan the camera above the seats in a plane parallel to the seat's elevation plane
+    camera.position.x = Math.max(minSeatX, Math.min(maxSeatX, currentX * 5)) // Clamp x position
+    camera.position.z = Math.max(minSeatZ, Math.min(maxSeatZ, baseCameraZ - currentY * 10)) // Reverse z movement for zoom-in on cursor up
+    camera.position.y = 4 // Keep the camera at a fixed height above the seats
 
-    // Adjust camera z-position for top view based on cursor movement (allow more reduction on cursor up)
-    camera.position.z = baseCameraZ + targetY * (maxCameraZ - baseCameraZ) / 2
-
-    // Move the cube along the positive z-axis based on cursor movement
-    cameraAnchor.position.z = originalCubeZ + targetY * 5
+    camera.lookAt(cameraAnchor.position)
 
     // Raycasting to detect hovered seat
     raycaster.setFromCamera(mouse, camera)
@@ -165,14 +185,10 @@ onMounted(() => {
       hoveredSeat = null
     }
 
-    camera.lookAt(cameraAnchor.position)    
-
     // Limit rendering to target FPS
     if (time - lastRenderTime >= frameInterval) {
-        stats.begin() // Start measuring FPS
-        renderer.render(scene, camera)
-        lastRenderTime = time
-        stats.end() // End measuring FPS
+      renderer.render(scene, camera)
+      lastRenderTime = time
     }
   }
 
