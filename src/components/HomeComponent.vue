@@ -28,6 +28,14 @@ onMounted(() => {
   scene.add(cube)
   scene.add(cameraAnchor)
 
+  // Add an elliptical plane resembling a cricket ground
+  const groundGeometry = new THREE.CircleGeometry(10, 64) // Radius 10, 64 segments for smoothness
+  const groundMaterial = new THREE.MeshBasicMaterial({ color: 0x228B22 }) // Green color resembling grass
+  const ground = new THREE.Mesh(groundGeometry, groundMaterial)
+  ground.rotation.x = -Math.PI / 2 // Rotate to lie flat on the xz-plane
+  ground.scale.set(1.5, 1, 1) // Scale to make it elliptical with longer axis on x-axis
+  scene.add(ground)
+
   const seatGeometry = new THREE.BoxGeometry(0.5, 0.5, 0.1)
 
   const baseRadius = 10 // Larger base radius for a less circular arch
@@ -39,10 +47,11 @@ onMounted(() => {
   const raycaster = new THREE.Raycaster() // Initialize raycaster
   const mouse = new THREE.Vector2() // Track mouse position
   let hoveredSeat = null // Track the currently hovered seat
+  let clickedSeat = null // Track the currently clicked seat
 
   const seats = [] // Store all seat meshes for raycasting
 
-  // Add seats to the array during creation
+  // Remove elevationOffset and adjust z-axis offset
   for (let row = 0; row < 5; row++) { // Loop for 4 rows
     const radius = baseRadius + row * rowSpacing // Increase radius for each row
     const circumference = radius * angleRange // Calculate the circumference of the quarter arch
@@ -52,10 +61,10 @@ onMounted(() => {
     for (let i = 0; i < seatsInRow; i++) { // Loop for dynamically calculated seats per row
       const angle = angleStep * i - (2.5 * Math.PI) / 4 // Start from -135 degrees to -90 degrees
       const x = radius * Math.cos(angle)
-      const z = radius * Math.sin(angle)
+      const z = radius * Math.sin(angle)// Increase z-axis offset to move seats further from origin
       const seatMaterial = new THREE.MeshBasicMaterial({ color: 0xf0f0f0 }) // Create a unique material for each seat
       const newCube = new THREE.Mesh(seatGeometry, seatMaterial)
-      newCube.position.set(x, row * elevationStep, -z) // Elevate each row
+      newCube.position.set(x, row * elevationStep, -z+0.2) // Adjust z position
 
       // Make the cube look at the original cube
       newCube.lookAt(cube.position)
@@ -69,8 +78,8 @@ onMounted(() => {
   const axesHelper = new THREE.AxesHelper(5) // Size of the axes
   scene.add(axesHelper)
 
-  camera.position.z = 15 // Move the camera further away along the z-axis
-  camera.position.y = 20 // Adjust the y-axis to ensure a better view of the cubes
+  camera.position.z = 10 // Move the camera further away along the z-axis
+  camera.position.y = 25 // Adjust the y-axis to ensure a better view of the cubes
 
   // Mouse movement variables
   let targetX = 0
@@ -91,6 +100,20 @@ onMounted(() => {
   }
 
   window.addEventListener('mousemove', onMouseMove)
+
+  const onMouseClick = () => {
+    if (hoveredSeat) {
+      if (hoveredSeat.material.color.getHex() === 0xff0000) {
+        // If the seat is already red, revert to the original color
+        hoveredSeat.material.color.set(0xf0f0f0)
+      } else {
+        // Otherwise, set the seat color to red
+        hoveredSeat.material.color.set(0xff0000)
+      }
+    }
+  }
+
+  window.addEventListener('click', onMouseClick)
 
   // Initialize stats.js
   const stats = new Stats()
@@ -117,10 +140,10 @@ onMounted(() => {
     camera.position.y = Math.max(currentY * 2 + 3, minCameraY) // Clamp y position to stay above the seats
 
     // Adjust camera z-position for top view based on cursor movement (allow more reduction on cursor up)
-    camera.position.z = baseCameraZ + targetY * (maxCameraZ - baseCameraZ) / 2 // Increase the divisor for more reduction
+    camera.position.z = baseCameraZ + targetY * (maxCameraZ - baseCameraZ) / 2
 
     // Move the cube along the positive z-axis based on cursor movement
-    cameraAnchor.position.z = originalCubeZ + targetY * 5 // Adjust the multiplier (5) for desired movement range
+    cameraAnchor.position.z = originalCubeZ + targetY * 5
 
     // Raycasting to detect hovered seat
     raycaster.setFromCamera(mouse, camera)
@@ -129,14 +152,16 @@ onMounted(() => {
     if (intersects.length > 0) {
       const intersectedSeat = intersects[0].object
       if (hoveredSeat !== intersectedSeat) {
-        if (hoveredSeat) {
-          hoveredSeat.material.color.set(0xf0f0f0) // Revert previous seat color
+        if (hoveredSeat && hoveredSeat.material.color.getHex() !== 0xff0000) {
+          hoveredSeat.material.color.set(0xf0f0f0) // Revert previous seat color if not clicked
         }
-        intersectedSeat.material.color.set(0xffff00) // Set hovered seat color to yellow
+        if (intersectedSeat.material.color.getHex() !== 0xff0000) {
+          intersectedSeat.material.color.set(0xffff00) // Set hovered seat color to yellow if not clicked
+        }
         hoveredSeat = intersectedSeat
       }
-    } else if (hoveredSeat) {
-      hoveredSeat.material.color.set(0xf0f0f0) // Revert color when no seat is hovered
+    } else if (hoveredSeat && hoveredSeat.material.color.getHex() !== 0xff0000) {
+      hoveredSeat.material.color.set(0xf0f0f0) // Revert color when no seat is hovered and not clicked
       hoveredSeat = null
     }
 
