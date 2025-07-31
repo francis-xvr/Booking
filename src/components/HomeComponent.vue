@@ -89,26 +89,31 @@ onMounted(() => {
   const frameInterval = 1000 / fps // Time per frame in milliseconds
   let lastRenderTime = 0 // Track the last render time
 
+  const minCameraY = 4 // Minimum y position for the camera to stay above the seats
+  const baseCameraZ = 15 // Original z position of the camera
+  const maxCameraZ = 16 // Reduce maximum z position for a less pronounced zoom
+
   const animate = (time) => {
     requestAnimationFrame(animate)
-
-    stats.begin() // Start measuring FPS
-
     // Smooth camera movement with damping (runs at full speed)
     currentX += (targetX - currentX) * dampingFactor
     currentY += (targetY - currentY) * dampingFactor
 
     camera.position.x = currentX * 2
-    camera.position.y = currentY * 2 + 3
-    camera.lookAt(cameraAnchor.position)
+    camera.position.y = Math.max(currentY * 2 + 3, minCameraY) // Clamp y position to stay above the seats
+
+    // Adjust camera z-position for top view based on cursor movement (reduced zoom factor)
+    camera.position.z = baseCameraZ + Math.max(-1, Math.min(1, targetY)) * (maxCameraZ - baseCameraZ) / 3
+
+    camera.lookAt(cameraAnchor.position)    
 
     // Limit rendering to target FPS
     if (time - lastRenderTime >= frameInterval) {
-      renderer.render(scene, camera)
-      lastRenderTime = time
+        stats.begin() // Start measuring FPS
+        renderer.render(scene, camera)
+        lastRenderTime = time
+        stats.end() // End measuring FPS
     }
-
-    stats.end() // End measuring FPS
   }
 
   animate(0)
