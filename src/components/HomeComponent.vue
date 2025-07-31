@@ -75,8 +75,8 @@ onMounted(() => {
   }
 
   // Add axis helper
-  const axesHelper = new THREE.AxesHelper(5) // Size of the axes
-  scene.add(axesHelper)
+//   const axesHelper = new THREE.AxesHelper(5) // Size of the axes
+//   scene.add(axesHelper)
 
   camera.position.z = 10 // Move the camera further away along the z-axis
   camera.position.y = 25 // Adjust the y-axis to ensure a better view of the cubes
