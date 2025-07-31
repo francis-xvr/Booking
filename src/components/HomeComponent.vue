@@ -28,7 +28,6 @@ onMounted(() => {
   scene.add(cube)
   scene.add(cameraAnchor)
 
-
   const seatGeometry = new THREE.BoxGeometry(0.5, 0.5, 0.1)
 
   const baseRadius = 10 // Larger base radius for a less circular arch
@@ -37,6 +36,13 @@ onMounted(() => {
   const seatGap = 0.6 // Desired gap between seats in a row
   const angleRange = Math.PI / 4 // Limit the arch to 45 degrees (from -135 to -90 degrees)
 
+  const raycaster = new THREE.Raycaster() // Initialize raycaster
+  const mouse = new THREE.Vector2() // Track mouse position
+  let hoveredSeat = null // Track the currently hovered seat
+
+  const seats = [] // Store all seat meshes for raycasting
+
+  // Add seats to the array during creation
   for (let row = 0; row < 5; row++) { // Loop for 4 rows
     const radius = baseRadius + row * rowSpacing // Increase radius for each row
     const circumference = radius * angleRange // Calculate the circumference of the quarter arch
@@ -47,13 +53,15 @@ onMounted(() => {
       const angle = angleStep * i - (2.5 * Math.PI) / 4 // Start from -135 degrees to -90 degrees
       const x = radius * Math.cos(angle)
       const z = radius * Math.sin(angle)
-      const newCube = new THREE.Mesh(seatGeometry, material)
+      const seatMaterial = new THREE.MeshBasicMaterial({ color: 0xf0f0f0 }) // Create a unique material for each seat
+      const newCube = new THREE.Mesh(seatGeometry, seatMaterial)
       newCube.position.set(x, row * elevationStep, -z) // Elevate each row
 
       // Make the cube look at the original cube
       newCube.lookAt(cube.position)
 
       scene.add(newCube)
+      seats.push(newCube) // Add seat to the array
     }
   }
 
@@ -75,7 +83,11 @@ onMounted(() => {
   const onMouseMove = (event) => {
     const { innerWidth, innerHeight } = window
     targetX = (event.clientX / innerWidth) * 2 - 1
-    targetY = -(event.clientY / innerHeight) * 2 + 1
+    targetY = -(event.clientY / innerHeight) * 2 + 1.5 // Normalize targetY to the full height of the window
+
+    // Update mouse position for raycasting
+    mouse.x = (event.clientX / innerWidth) * 2 - 1
+    mouse.y = -(event.clientY / innerHeight) * 2 + 1
   }
 
   window.addEventListener('mousemove', onMouseMove)
@@ -90,8 +102,10 @@ onMounted(() => {
   let lastRenderTime = 0 // Track the last render time
 
   const minCameraY = 4 // Minimum y position for the camera to stay above the seats
-  const baseCameraZ = 15 // Original z position of the camera
+  const baseCameraZ = 16 // Original z position of the camera
   const maxCameraZ = 16 // Reduce maximum z position for a less pronounced zoom
+
+  const originalCubeZ = cameraAnchor.position.z // Store the original z position of the cube
 
   const animate = (time) => {
     requestAnimationFrame(animate)
@@ -102,8 +116,29 @@ onMounted(() => {
     camera.position.x = currentX * 2
     camera.position.y = Math.max(currentY * 2 + 3, minCameraY) // Clamp y position to stay above the seats
 
-    // Adjust camera z-position for top view based on cursor movement (reduced zoom factor)
-    camera.position.z = baseCameraZ + Math.max(-1, Math.min(1, targetY)) * (maxCameraZ - baseCameraZ) / 3
+    // Adjust camera z-position for top view based on cursor movement (allow more reduction on cursor up)
+    camera.position.z = baseCameraZ + targetY * (maxCameraZ - baseCameraZ) / 2 // Increase the divisor for more reduction
+
+    // Move the cube along the positive z-axis based on cursor movement
+    cameraAnchor.position.z = originalCubeZ + targetY * 5 // Adjust the multiplier (5) for desired movement range
+
+    // Raycasting to detect hovered seat
+    raycaster.setFromCamera(mouse, camera)
+    const intersects = raycaster.intersectObjects(seats)
+
+    if (intersects.length > 0) {
+      const intersectedSeat = intersects[0].object
+      if (hoveredSeat !== intersectedSeat) {
+        if (hoveredSeat) {
+          hoveredSeat.material.color.set(0xf0f0f0) // Revert previous seat color
+        }
+        intersectedSeat.material.color.set(0xffff00) // Set hovered seat color to yellow
+        hoveredSeat = intersectedSeat
+      }
+    } else if (hoveredSeat) {
+      hoveredSeat.material.color.set(0xf0f0f0) // Revert color when no seat is hovered
+      hoveredSeat = null
+    }
 
     camera.lookAt(cameraAnchor.position)    
 
